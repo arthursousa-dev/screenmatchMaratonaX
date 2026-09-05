@@ -1,5 +1,6 @@
 <?php
 
+session_start();
 require __DIR__ . "/src/Repositorio/CatalogoRepositorio.php";
 require __DIR__ . "/src/Calculos/CalculadoraDeMaratona.php";
 require __DIR__ . "/src/funcoes.php";

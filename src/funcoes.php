@@ -38,3 +38,24 @@ function iniciaisTitulo(string $nome): string
     $iniciais = array_map(fn($p) => mb_strtoupper(mb_substr($p, 0, 1)), array_slice($palavras, 0, 2));
     return implode('', $iniciais);
 }
+
+/**
+ * Token CSRF por sessão.
+ */
+function csrfToken(): string
+{
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function csrfCampo(): string
+{
+    return '<input type="hidden" name="csrf_token" value="' . csrfToken() . '">';
+}
+
+function csrfValido(?string $token): bool
+{
+    return !empty($_SESSION['csrf_token']) && !empty($token) && hash_equals($_SESSION['csrf_token'], $token);
+}

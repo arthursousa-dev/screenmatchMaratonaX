@@ -1,6 +1,13 @@
 <?php
 
+session_start();
 require __DIR__ . "/src/Repositorio/CatalogoRepositorio.php";
+require __DIR__ . "/src/funcoes.php";
+
+if (!csrfValido($_POST['csrf_token'] ?? null)) {
+    http_response_code(403);
+    die('Sessão expirada. Recarregue a página e tente novamente.');
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: adicionar.php');

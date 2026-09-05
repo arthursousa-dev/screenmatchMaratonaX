@@ -356,6 +356,8 @@ main {
 .form-nota button:hover { background: var(--teal); color: #06231d; }
 .form-nota button:active { transform: scale(.95); }
 
+.form-excluir { display: contents; }
+
 .btn-excluir {
   width: 34px; height: 34px;
   display: flex; align-items: center; justify-content: center;

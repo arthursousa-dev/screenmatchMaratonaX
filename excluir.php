@@ -1,9 +1,16 @@
 <?php
 
+session_start();
 require __DIR__ . "/src/Repositorio/CatalogoRepositorio.php";
+require __DIR__ . "/src/funcoes.php";
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrfValido($_POST['csrf_token'] ?? null)) {
+    header('Location: index.php');
+    exit;
+}
 
 $repositorio = new CatalogoRepositorio(__DIR__ . "/dados/catalogo.json");
-$id = $_GET['id'] ?? '';
+$id = $_POST['id'] ?? '';
 
 if ($id !== '') {
     $itens = $repositorio->lerItens();

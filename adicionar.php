@@ -1,3 +1,4 @@
+<?php session_start(); require __DIR__ . "/src/funcoes.php"; ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -20,6 +21,7 @@
 
   <div class="form-card">
     <form action="salvar.php" method="post" id="formTitulo">
+      <?= csrfCampo() ?>
 
       <div class="tipo-toggle" id="toggleTipo">
         <div class="indicador"></div>

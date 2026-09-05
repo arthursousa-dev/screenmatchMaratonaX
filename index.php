@@ -1,5 +1,6 @@
 <?php
 
+session_start();
 require __DIR__ . "/src/Repositorio/CatalogoRepositorio.php";
 require __DIR__ . "/src/funcoes.php";
 
@@ -64,13 +65,18 @@ $itens = $repositorio->lerItens();
 
             <div class="card-rodape">
               <form class="form-nota" action="avaliar.php" method="post">
+                <?= csrfCampo() ?>
                 <input type="hidden" name="id" value="<?= htmlspecialchars($item['id']) ?>">
                 <input type="number" name="nota" min="0" max="5" step="0.5" placeholder="Nota" title="Nota de 0 a 5" required>
                 <button type="submit">Avaliar</button>
               </form>
-              <a class="btn-excluir" href="excluir.php?id=<?= urlencode($item['id']) ?>" onclick="return confirm('Remover este título do catálogo?');" title="Excluir">
+              <form class="form-excluir" action="excluir.php" method="post" onsubmit="return confirm('Remover este título do catálogo?');">
+                <?= csrfCampo() ?>
+                <input type="hidden" name="id" value="<?= htmlspecialchars($item['id']) ?>">
+                <button type="submit" class="btn-excluir" title="Excluir">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-              </a>
+                </button>
+              </form>
             </div>
           </div>
         </div>
