@@ -9,12 +9,14 @@ Catálogo pessoal de filmes e séries desenvolvido em PHP, com Programação Ori
 - Avaliação de títulos (notas de 0 a 5, meio ponto em meio ponto)
 - Calculadora de maratona: selecione títulos do catálogo e veja o tempo total necessário para assistir a todos
 - Exclusão de títulos
-- Persistência de dados em JSON, com escrita segura (`flock`)
+- Persistência em **PostgreSQL**, com o repositório (`CatalogoRepositorio`) isolando toda a camada de dados
 
 ## Segurança
 
 - Proteção CSRF (token por sessão, validado com `hash_equals()`) em todo formulário que altera dado — cadastro, avaliação e exclusão
 - Exclusão de título feita via `POST`, nunca `GET` — evita que um clique acidental em link, um crawler ou o prefetch do navegador disparem uma exclusão sem intenção do usuário
+- Cookies de sessão com `httponly`, `samesite=Lax` e `secure` (quando em HTTPS)
+- `.htaccess` bloqueando acesso direto a `.env`/`.sql`/`.log` e às pastas `app/`, `database/`, `src/`
 
 ## Design
 
@@ -33,18 +35,22 @@ Microinterações: cards com entrada escalonada, seletor de nota por estrelas in
 ## Tecnologias
 
 - PHP 8.3 (tipagem forte, enums, propriedades `readonly`)
+- **PostgreSQL** via PDO, com prepared statements
 - HTML5 / CSS3
-- Armazenamento de dados: JSON
 
 ## Como rodar localmente
 
-1. Tenha o PHP instalado (versão 8.1+) ou use Laragon/XAMPP.
-2. Clone o repositório e entre na pasta do projeto.
-3. Inicie um servidor local:
-   ```bash
-   php -S localhost:8000
-   ```
-4. Acesse `http://localhost:8000` no navegador.
+```bash
+createdb maratonax
+psql maratonax < database/schema.sql
+psql maratonax < database/seed.sql
+
+cp .env.example .env
+
+php -S localhost:8000
+```
+
+Acesse `http://localhost:8000`.
 
 ## Origem do projeto
 
