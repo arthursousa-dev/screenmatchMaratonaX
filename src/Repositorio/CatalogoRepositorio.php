@@ -4,18 +4,17 @@ require_once __DIR__ . "/../Modelo/Genero.php";
 require_once __DIR__ . "/../Modelo/Titulo.php";
 require_once __DIR__ . "/../Modelo/Filme.php";
 require_once __DIR__ . "/../Modelo/Serie.php";
+require_once __DIR__ . "/../../app/Config/Database.php";
+
+use App\Config\Database;
 
 class CatalogoRepositorio
 {
-    private string $caminhoArquivo;
-
-    public function __construct(string $caminhoArquivo)
+    public function __construct(string $caminhoArquivo = '')
     {
-        $this->caminhoArquivo = $caminhoArquivo;
-
-        if (!file_exists($this->caminhoArquivo)) {
-            file_put_contents($this->caminhoArquivo, json_encode([]));
-        }
+        // Parâmetro mantido por compatibilidade com quem instancia
+        // a classe (`new CatalogoRepositorio(__DIR__ . "/dados/catalogo.json")`);
+        // a persistência real agora é o PostgreSQL, não esse caminho.
     }
 
     /**
@@ -23,24 +22,90 @@ class CatalogoRepositorio
      */
     public function lerItens(): array
     {
-        $conteudo = file_get_contents($this->caminhoArquivo);
-        $itens = json_decode($conteudo, true);
+        $pdo = Database::getConnection();
+        $titulos = $pdo->query('SELECT * FROM titulos ORDER BY nome')->fetchAll();
 
-        return is_array($itens) ? $itens : [];
+        $notasStmt = $pdo->prepare('SELECT nota FROM titulo_notas WHERE id_titulo = :id ORDER BY id');
+
+        return array_map(function ($t) use ($notasStmt) {
+            $notasStmt->execute([':id' => $t['id']]);
+            $notas = array_map('floatval', $notasStmt->fetchAll(\PDO::FETCH_COLUMN));
+
+            $item = [
+                'id' => $t['id'],
+                'tipo' => $t['tipo'],
+                'nome' => $t['nome'],
+                'anoLancamento' => (int) $t['ano_lancamento'],
+                'genero' => $t['genero'],
+                'notas' => $notas,
+            ];
+
+            if ($t['tipo'] === 'serie') {
+                $item['temporadas'] = (int) $t['temporadas'];
+                $item['episodiosPorTemporada'] = (int) $t['episodios_por_temporada'];
+                $item['minutosPorEpisodio'] = (int) $t['minutos_por_episodio'];
+            } else {
+                $item['duracaoEmMinutos'] = (int) $t['duracao_em_minutos'];
+            }
+
+            return $item;
+        }, $titulos);
     }
 
     /**
-     * Grava os itens crus no catálogo, com escrita segura (flock).
+     * Grava os itens crus no catálogo (upsert por ID, dentro de uma
+     * transação; remove do banco o que não veio mais no array).
      */
     public function gravarItens(array $itens): void
     {
-        $handle = fopen($this->caminhoArquivo, 'c+');
-        flock($handle, LOCK_EX);
-        ftruncate($handle, 0);
-        fwrite($handle, json_encode($itens, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        fflush($handle);
-        flock($handle, LOCK_UN);
-        fclose($handle);
+        $pdo = Database::getConnection();
+
+        try {
+            $pdo->beginTransaction();
+
+            $idsAtuais = $pdo->query('SELECT id FROM titulos')->fetchAll(\PDO::FETCH_COLUMN);
+            $idsNovos = array_column($itens, 'id');
+
+            $upsert = $pdo->prepare(
+                'INSERT INTO titulos (id, tipo, nome, ano_lancamento, genero, duracao_em_minutos, temporadas, episodios_por_temporada, minutos_por_episodio)
+                 VALUES (:id, :tipo, :nome, :ano, :genero, :duracao, :temporadas, :episodios, :min_ep)
+                 ON CONFLICT (id) DO UPDATE SET
+                    tipo=EXCLUDED.tipo, nome=EXCLUDED.nome, ano_lancamento=EXCLUDED.ano_lancamento,
+                    genero=EXCLUDED.genero, duracao_em_minutos=EXCLUDED.duracao_em_minutos,
+                    temporadas=EXCLUDED.temporadas, episodios_por_temporada=EXCLUDED.episodios_por_temporada,
+                    minutos_por_episodio=EXCLUDED.minutos_por_episodio'
+            );
+            $limpaNotas = $pdo->prepare('DELETE FROM titulo_notas WHERE id_titulo = :id');
+            $insereNota = $pdo->prepare('INSERT INTO titulo_notas (id_titulo, nota) VALUES (:id, :nota)');
+
+            foreach ($itens as $item) {
+                $ehSerie = $item['tipo'] === 'serie';
+                $upsert->execute([
+                    ':id' => $item['id'], ':tipo' => $item['tipo'], ':nome' => $item['nome'],
+                    ':ano' => $item['anoLancamento'], ':genero' => $item['genero'],
+                    ':duracao' => $ehSerie ? null : $item['duracaoEmMinutos'],
+                    ':temporadas' => $ehSerie ? $item['temporadas'] : null,
+                    ':episodios' => $ehSerie ? $item['episodiosPorTemporada'] : null,
+                    ':min_ep' => $ehSerie ? $item['minutosPorEpisodio'] : null,
+                ]);
+
+                $limpaNotas->execute([':id' => $item['id']]);
+                foreach (($item['notas'] ?? []) as $nota) {
+                    $insereNota->execute([':id' => $item['id'], ':nota' => $nota]);
+                }
+            }
+
+            $remover = array_diff($idsAtuais, $idsNovos);
+            if ($remover) {
+                $in = implode(',', array_map(fn($id) => $pdo->quote($id), $remover));
+                $pdo->exec("DELETE FROM titulos WHERE id IN ($in)");
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            error_log('gravarItens falhou: ' . $e->getMessage());
+        }
     }
 
     /**
