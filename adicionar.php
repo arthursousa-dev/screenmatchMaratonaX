@@ -1,4 +1,4 @@
-<?php session_start(); require __DIR__ . "/src/funcoes.php"; ?>
+<?php require __DIR__ . "/bootstrap_sessao.php"; require __DIR__ . "/src/funcoes.php"; ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
