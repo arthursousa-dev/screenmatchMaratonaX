@@ -54,9 +54,7 @@ if (isset($_POST['nota']) && $_POST['nota'] !== '' && is_numeric($_POST['nota'])
 $id = uniqid('titulo_', true);
 $item = $repositorio->desidratar($titulo, $id, $tipo);
 
-$itens = $repositorio->lerItens();
-$itens[] = $item;
-$repositorio->gravarItens($itens);
+$repositorio->inserir($item);
 
 header('Location: index.php');
 exit;

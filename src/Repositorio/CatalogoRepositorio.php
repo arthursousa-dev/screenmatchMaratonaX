@@ -53,59 +53,72 @@ class CatalogoRepositorio
     }
 
     /**
-     * Grava os itens crus no catálogo (upsert por ID, dentro de uma
-     * transação; remove do banco o que não veio mais no array).
+     * Insere um título novo e suas notas iniciais numa transação.
+     * Gravações pontuais: antes, cada operação reescrevia o catálogo inteiro.
      */
-    public function gravarItens(array $itens): void
+    public function inserir(array $item): bool
     {
         $pdo = Database::getConnection();
+        $ehSerie = $item['tipo'] === 'serie';
 
         try {
             $pdo->beginTransaction();
-
-            $idsAtuais = $pdo->query('SELECT id FROM titulos')->fetchAll(\PDO::FETCH_COLUMN);
-            $idsNovos = array_column($itens, 'id');
-
-            $upsert = $pdo->prepare(
+            $pdo->prepare(
                 'INSERT INTO titulos (id, tipo, nome, ano_lancamento, genero, duracao_em_minutos, temporadas, episodios_por_temporada, minutos_por_episodio)
-                 VALUES (:id, :tipo, :nome, :ano, :genero, :duracao, :temporadas, :episodios, :min_ep)
-                 ON CONFLICT (id) DO UPDATE SET
-                    tipo=EXCLUDED.tipo, nome=EXCLUDED.nome, ano_lancamento=EXCLUDED.ano_lancamento,
-                    genero=EXCLUDED.genero, duracao_em_minutos=EXCLUDED.duracao_em_minutos,
-                    temporadas=EXCLUDED.temporadas, episodios_por_temporada=EXCLUDED.episodios_por_temporada,
-                    minutos_por_episodio=EXCLUDED.minutos_por_episodio'
-            );
-            $limpaNotas = $pdo->prepare('DELETE FROM titulo_notas WHERE id_titulo = :id');
-            $insereNota = $pdo->prepare('INSERT INTO titulo_notas (id_titulo, nota) VALUES (:id, :nota)');
-
-            foreach ($itens as $item) {
-                $ehSerie = $item['tipo'] === 'serie';
-                $upsert->execute([
-                    ':id' => $item['id'], ':tipo' => $item['tipo'], ':nome' => $item['nome'],
-                    ':ano' => $item['anoLancamento'], ':genero' => $item['genero'],
-                    ':duracao' => $ehSerie ? null : $item['duracaoEmMinutos'],
-                    ':temporadas' => $ehSerie ? $item['temporadas'] : null,
-                    ':episodios' => $ehSerie ? $item['episodiosPorTemporada'] : null,
-                    ':min_ep' => $ehSerie ? $item['minutosPorEpisodio'] : null,
-                ]);
-
-                $limpaNotas->execute([':id' => $item['id']]);
-                foreach (($item['notas'] ?? []) as $nota) {
-                    $insereNota->execute([':id' => $item['id'], ':nota' => $nota]);
-                }
+                 VALUES (:id, :tipo, :nome, :ano, :genero, :duracao, :temporadas, :episodios, :min_ep)'
+            )->execute([
+                ':id' => $item['id'], ':tipo' => $item['tipo'], ':nome' => $item['nome'],
+                ':ano' => $item['anoLancamento'], ':genero' => $item['genero'],
+                ':duracao' => $ehSerie ? null : $item['duracaoEmMinutos'],
+                ':temporadas' => $ehSerie ? $item['temporadas'] : null,
+                ':episodios' => $ehSerie ? $item['episodiosPorTemporada'] : null,
+                ':min_ep' => $ehSerie ? $item['minutosPorEpisodio'] : null,
+            ]);
+            foreach ($item['notas'] ?? [] as $nota) {
+                $this->gravarNota($item['id'], (float) $nota);
             }
-
-            $remover = array_diff($idsAtuais, $idsNovos);
-            if ($remover) {
-                $in = implode(',', array_map(fn($id) => $pdo->quote($id), $remover));
-                $pdo->exec("DELETE FROM titulos WHERE id IN ($in)");
-            }
-
             $pdo->commit();
+            return true;
         } catch (\Throwable $e) {
-            $pdo->rollBack();
-            error_log('gravarItens falhou: ' . $e->getMessage());
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('inserir título falhou: ' . $e->getMessage());
+            return false;
         }
+    }
+
+    /** Acrescenta uma nota sem tocar nas demais (duas avaliações simultâneas não se sobrescrevem). */
+    public function adicionarNota(string $id, float $nota): bool
+    {
+        try {
+            return $this->gravarNota($id, $nota);
+        } catch (\Throwable $e) {
+            error_log('adicionarNota falhou: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /** Remove um título; as notas saem junto pelo ON DELETE CASCADE. */
+    public function excluir(string $id): bool
+    {
+        try {
+            $stmt = Database::getConnection()->prepare('DELETE FROM titulos WHERE id = :id');
+            $stmt->execute([':id' => $id]);
+            return $stmt->rowCount() > 0;
+        } catch (\Throwable $e) {
+            error_log('excluir título falhou: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    private function gravarNota(string $id, float $nota): bool
+    {
+        $stmt = Database::getConnection()->prepare(
+            'INSERT INTO titulo_notas (id_titulo, nota) SELECT id, :nota FROM titulos WHERE id = :id'
+        );
+        $stmt->execute([':id' => $id, ':nota' => $nota]);
+        return $stmt->rowCount() > 0;
     }
 
     /**

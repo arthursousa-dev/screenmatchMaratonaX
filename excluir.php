@@ -13,9 +13,7 @@ $repositorio = new CatalogoRepositorio(__DIR__ . "/dados/catalogo.json");
 $id = $_POST['id'] ?? '';
 
 if ($id !== '') {
-    $itens = $repositorio->lerItens();
-    $itens = array_values(array_filter($itens, fn($item) => $item['id'] !== $id));
-    $repositorio->gravarItens($itens);
+    $repositorio->excluir($id);
 }
 
 header('Location: index.php');

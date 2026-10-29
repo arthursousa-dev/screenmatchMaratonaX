@@ -30,19 +30,7 @@ if ($nota < 0 || $nota > 5) {
     exit;
 }
 
-$itens = $repositorio->lerItens();
-
-foreach ($itens as &$item) {
-    if ($item['id'] === $id) {
-        $titulo = $repositorio->hidratar($item);
-        $titulo->avalia($nota);
-        $item = $repositorio->desidratar($titulo, $item['id'], $item['tipo']);
-        break;
-    }
-}
-unset($item);
-
-$repositorio->gravarItens($itens);
+$repositorio->adicionarNota($id, $nota);
 
 header('Location: index.php');
 exit;
