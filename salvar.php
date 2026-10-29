@@ -20,8 +20,19 @@ $tipo = $_POST['tipo'] ?? 'filme';
 $nome = trim($_POST['nome'] ?? '');
 $ano = (int) ($_POST['ano'] ?? 0);
 $genero = CatalogoRepositorio::generoFromNome($_POST['genero'] ?? 'Drama');
+$inteiro = fn(string $campo) => (int) ($_POST[$campo] ?? 0);
+// Limites do schema (VARCHAR(150), SMALLINT) e do formulário; fora deles o INSERT falhava em silêncio.
+$positivo = fn(int $v) => $v >= 1 && $v <= 32767;
 
-if ($nome === '' || $ano === 0) {
+$valido = in_array($tipo, ['filme', 'serie'], true)
+    && $nome !== '' && strlen($nome) <= 150
+    && $ano >= 1888 && $ano <= (int) date('Y') + 5
+    && ($tipo === 'filme'
+        ? $positivo($inteiro('duracaoEmMinutos'))
+        : $positivo($inteiro('temporadas')) && $positivo($inteiro('episodiosPorTemporada')) && $positivo($inteiro('minutosPorEpisodio')));
+
+if (!$valido) {
+    $_SESSION['erro'] = 'Confira os dados: nome, ano entre 1888 e ' . ((int) date('Y') + 5) . ' e durações maiores que zero.';
     header('Location: adicionar.php');
     exit;
 }
@@ -54,7 +65,11 @@ if (isset($_POST['nota']) && $_POST['nota'] !== '' && is_numeric($_POST['nota'])
 $id = uniqid('titulo_', true);
 $item = $repositorio->desidratar($titulo, $id, $tipo);
 
-$repositorio->inserir($item);
+if (!$repositorio->inserir($item)) {
+    $_SESSION['erro'] = 'Não foi possível salvar o título. Tente novamente.';
+    header('Location: adicionar.php');
+    exit;
+}
 
 header('Location: index.php');
 exit;

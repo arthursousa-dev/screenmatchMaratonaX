@@ -19,6 +19,11 @@
     </div>
   </div>
 
+  <?php if (!empty($_SESSION['erro'])): ?>
+    <p class="aviso-erro" role="alert"><?= htmlspecialchars($_SESSION['erro']) ?></p>
+    <?php unset($_SESSION['erro']); ?>
+  <?php endif; ?>
+
   <div class="form-card">
     <form action="salvar.php" method="post" id="formTitulo">
       <?= csrfCampo() ?>
@@ -37,13 +42,13 @@
 
       <div class="campo">
         <label for="nome">Nome</label>
-        <input type="text" name="nome" id="nome" required placeholder="Ex: Thor - Ragnarok">
+        <input type="text" name="nome" id="nome" required maxlength="150" placeholder="Ex: Thor - Ragnarok">
       </div>
 
       <div class="linha-dois">
         <div class="campo">
           <label for="ano">Ano de lançamento</label>
-          <input type="number" name="ano" id="ano" required min="1900" max="2100">
+          <input type="number" name="ano" id="ano" required min="1888" max="<?= (int) date('Y') + 5 ?>">
         </div>
         <div class="campo">
           <label for="genero">Gênero</label>
