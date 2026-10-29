@@ -25,11 +25,14 @@ class CatalogoRepositorio
         $pdo = Database::getConnection();
         $titulos = $pdo->query('SELECT * FROM titulos ORDER BY nome')->fetchAll();
 
-        $notasStmt = $pdo->prepare('SELECT nota FROM titulo_notas WHERE id_titulo = :id ORDER BY id');
+        // Todas as notas numa consulta só (antes: uma consulta por título).
+        $notasPorTitulo = [];
+        foreach ($pdo->query('SELECT id_titulo, nota FROM titulo_notas ORDER BY id') as $linha) {
+            $notasPorTitulo[$linha['id_titulo']][] = (float) $linha['nota'];
+        }
 
-        return array_map(function ($t) use ($notasStmt) {
-            $notasStmt->execute([':id' => $t['id']]);
-            $notas = array_map('floatval', $notasStmt->fetchAll(\PDO::FETCH_COLUMN));
+        return array_map(function ($t) use ($notasPorTitulo) {
+            $notas = $notasPorTitulo[$t['id']] ?? [];
 
             $item = [
                 'id' => $t['id'],
