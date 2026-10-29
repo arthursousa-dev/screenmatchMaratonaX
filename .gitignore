@@ -8,6 +8,8 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Dependências (caso adicionadas futuramente)
+# Dependências
 vendor/
 node_modules/
+composer.lock
+.phpunit.result.cache

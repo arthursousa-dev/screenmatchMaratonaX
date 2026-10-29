@@ -52,6 +52,16 @@ php -S localhost:8000
 
 Acesse `http://localhost:8000`.
 
+## Testes
+
+```bash
+composer install
+createdb maratonax_test && psql maratonax_test < database/schema.sql && psql maratonax_test < database/seed.sql
+DB_NAME=maratonax_test vendor/bin/phpunit
+```
+
+Cobrem o modelo (duração de filme e série, média e escala das notas, cálculo da maratona, formatação) e o repositório: gravar um título, acrescentar nota sem tocar nas notas de outros títulos, recusar tipo inválido e excluir em cascata. O GitHub Actions roda a suíte contra um PostgreSQL a cada push.
+
 ## Origem do projeto
 
 Este projeto nasceu do curso **PHP: crie a sua primeira aplicação** (Alura), que introduz Orientação a Objetos em PHP através do exemplo do ScreenMatch — aqui rebatizado como **MaratonaX**. As classes de domínio (`Titulo`, `Filme`, `Serie`, `Genero`, `CalculadoraDeMaratona`) foram mantidas fiéis ao conteúdo do curso; toda a camada de persistência, interface web e funcionalidades de catálogo foram desenvolvidas por conta própria como evolução do exercício original.
